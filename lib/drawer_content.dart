@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:quiz/multi_P.dart';
+import 'package:quiz/bet_S.dart';
 
 class CustomDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Drawer(
+    return SafeArea(
+        child: Drawer(
       width: 170,
       child: Container(
         decoration: BoxDecoration(
@@ -53,7 +54,7 @@ class CustomDrawer extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildOutlinedTile({

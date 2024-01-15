@@ -3,17 +3,19 @@ import 'questions.dart';
 import 'dart:math';
 import 'animated_bkg.dart';
 import 'dart:async';
+import 'main.dart';
 
 const int numberOfQuestions = 10;
 const Duration answerDelay = Duration(milliseconds: 500);
 const Duration animationDuration = Duration(milliseconds: 167);
 const double initialFontSize = 27;
-int hintCount = 11;
 
 class QuestionsPage extends StatefulWidget {
   final List<String> selectedTitles;
 
-  QuestionsPage(this.selectedTitles);
+  QuestionsPage({
+    required this.selectedTitles,
+  });
 
   @override
   _QuestionsPageState createState() => _QuestionsPageState();
@@ -27,7 +29,7 @@ class _QuestionsPageState extends State<QuestionsPage>
   bool showCorrectAnswer = false;
   bool showWrongAnswer = false;
   bool hintUsed = false;
-  int timerSeconds = 7;
+  int timerSeconds = 10;
   List<int> questionHintCounts = [];
   List<bool> hintSnackBarShown = [];
   List<int> hintPressedCount = [];
@@ -35,11 +37,13 @@ class _QuestionsPageState extends State<QuestionsPage>
   late AnimationController _controller;
   late Animation<double> _animation;
   late Timer _timer;
+  int mutableHintCount = 0;
   @override
   void initState() {
     super.initState();
     selectRandomQuestions();
     startTimer();
+    TotalScoreManager.initialize();
 
     _controller = AnimationController(
       vsync: this,
@@ -50,6 +54,11 @@ class _QuestionsPageState extends State<QuestionsPage>
       curve: Curves.easeInOut,
     );
     initializeHintCounts();
+    HintManager.initialize().then((_) {
+      // Ensure the HintManager is initialized before proceeding
+      mutableHintCount = HintManager.getHintCount();
+      // Rest of your initialization logic here...
+    });
   }
 
   @override
@@ -115,7 +124,7 @@ class _QuestionsPageState extends State<QuestionsPage>
                       'Question ${questionIndex + 1}/${selectedQuestions.length}'),
                   Tooltip(
                     message:
-                        'Hints remaining: $hintCount', // Show hint count in tooltip
+                        'Hints remaining: $mutableHintCount', // Show hint count in tooltip
                     child: IconButton(
                       icon: Icon(Icons.lightbulb),
                       onPressed: () => _useHint(questionIndex),
@@ -158,19 +167,22 @@ class _QuestionsPageState extends State<QuestionsPage>
     setState(() {
       if (hintPressedCount[index] < 2) {
         if (hintPressedCount[index] == 0) {
-          if (hintCount > 0) {
-            hintCount--;
+          if (mutableHintCount > 0) {
+            mutableHintCount--;
             questionHintCounts[index]--;
             _highlightWrongOption();
+            HintManager.deductGeneralHint(); // Deduct the general hint count
             hintPressedCount[index]++;
           } else {
             _showSnackBarIfRequired(index, 'Insufficient hint count!');
           }
         } else {
-          if (hintCount >= 2) {
-            hintCount -= 2;
+          if (mutableHintCount >= 2) {
+            mutableHintCount -= 2;
             questionHintCounts[index] -= 2;
-            _highlightWrongOption(); // Trigger the hint logic again for the second press
+            _highlightWrongOption();
+            HintManager.deductGeneralHint();
+            HintManager.deductGeneralHint(); // Deduct the general hint count
             hintPressedCount[index]++;
           } else {
             _showSnackBarIfRequired(index, 'Insufficient hint count!');
@@ -184,7 +196,9 @@ class _QuestionsPageState extends State<QuestionsPage>
     hintPressedCount = List.generate(selectedQuestions.length, (_) => 0);
     questionHintCounts = List.generate(
       selectedQuestions.length,
-      (_) => questionHintCounts.isEmpty ? hintCount : questionHintCounts.last,
+      (_) => questionHintCounts.isEmpty
+          ? mutableHintCount
+          : questionHintCounts.last,
     );
     hintSnackBarShown = List.generate(selectedQuestions.length, (_) => false);
   }
@@ -215,20 +229,37 @@ class _QuestionsPageState extends State<QuestionsPage>
         selectedOptionIndex =
             randomWrongOptionIndex; // Highlight the first wrong option
       });
-    } else if (hintPressedCount[questionIndex] == 1 &&
-        questionHintCounts[questionIndex] >= 2) {
+    } else if (hintPressedCount[questionIndex] == 1) {
       if (selectedAnswer != correctAnswer) {
+        int firstWrongOption = -1;
+        for (int i = 0; i < question.options.length; i++) {
+          if (i != correctAnswer && i != selectedAnswer) {
+            firstWrongOption = i;
+            break;
+          }
+        }
+
         setState(() {
-          int count = 0;
-          for (int i = 0; i < question.options.length; i++) {
-            if (i != correctAnswer && i != selectedAnswer) {
-              count++;
-              if (count == 2) {
-                selectedOptionIndex = i; // Highlight the second wrong option
-                break;
-              }
+          selectedOptionIndex =
+              firstWrongOption; // Highlight the first wrong option
+        });
+      }
+    } else if (hintPressedCount[questionIndex] == 2) {
+      if (selectedAnswer != correctAnswer) {
+        int secondWrongOption = -1;
+        int count = 0;
+        for (int i = 0; i < question.options.length; i++) {
+          if (i != correctAnswer && i != selectedAnswer) {
+            count++;
+            if (count == 2) {
+              secondWrongOption = i; // Highlight the second wrong option
+              break;
             }
           }
+        }
+
+        setState(() {
+          selectedOptionIndex = secondWrongOption;
         });
       }
     }
@@ -405,7 +436,7 @@ class _QuestionsPageState extends State<QuestionsPage>
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          primary: isSecondHint ? Colors.blue : Colors.blue,
+                          primary: isSecondHint ? Colors.red : Colors.blue,
                           elevation: 5,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -484,6 +515,7 @@ class _QuestionsPageState extends State<QuestionsPage>
     setState(() {
       if (selectedOptionIndex == correctAnswer) {
         showCorrectAnswer = true;
+        TotalScoreManager.addToTotalScore(10);
       } else {
         showWrongAnswer = true;
       }
@@ -506,11 +538,19 @@ class _QuestionsPageState extends State<QuestionsPage>
       if (questionIndex < selectedQuestions.length - 1) {
         questionIndex++;
         selectedOptionIndex = -1;
-        timerSeconds = 7; // Reset the timer for the next question
+        timerSeconds = 10; // Reset the timer for the next question
         _timer.cancel(); // Cancel the previous timer
         startTimer(); // Start the timer for the next question
       } else {
-        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(
+              hintCount: HintManager.getHintCount(),
+              totalScore: TotalScoreManager.getTotalScore(),
+            ),
+          ),
+        );
         _timer.cancel(); // Stop the timer when all questions are finished
       }
 

@@ -1,12 +1,75 @@
 import 'package:flutter/material.dart';
 import 'questions_page.dart';
 import 'drawer_content.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(AnimeQuizApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await HintManager.initialize();
+  await TotalScoreManager.initialize();
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  int defaultHintCount = prefs.getInt('hintCount') ?? 41;
+  int defaultTotalScore = prefs.getInt('totalScore') ?? 500;
+
+  runApp(
+    AnimeQuizApp(hintCount: defaultHintCount, totalScore: defaultTotalScore),
+  );
+}
+
+class HintManager {
+  static late SharedPreferences _prefs;
+
+  static Future<void> initialize() async =>
+      _prefs = await SharedPreferences.getInstance();
+
+  static int getHintCount() => _prefs.getInt('hintCount') ?? 41;
+
+  static void setHintCount(int count) => _prefs.setInt('hintCount', count);
+
+  static void deductGeneralHint() {
+    int currentCount = getHintCount();
+    if (currentCount > 0) {
+      currentCount--;
+      setHintCount(currentCount);
+    }
+  }
+
+  static incrementGeneralHint() {
+    int currentCount = HintManager.getHintCount();
+    currentCount++;
+    HintManager.setHintCount(currentCount);
+  }
+}
+
+class TotalScoreManager {
+  static late SharedPreferences _prefs;
+
+  static Future<void> initialize() async =>
+      _prefs = await SharedPreferences.getInstance();
+
+  static int getTotalScore() => _prefs.getInt('totalScore') ?? 500;
+
+  static void setTotalScore(int score) => _prefs.setInt('totalScore', score);
+
+  static void addToTotalScore(int scoreToAdd) {
+    int currentScore = getTotalScore();
+    currentScore += scoreToAdd;
+    setTotalScore(currentScore);
+  }
+
+  static void subtractFromTotalScore(int scoreToSubtract) {
+    int currentScore = getTotalScore();
+    currentScore -= scoreToSubtract;
+    setTotalScore(currentScore);
+  }
 }
 
 class AnimeQuizApp extends StatelessWidget {
+  final int hintCount;
+  final int totalScore;
+
+  AnimeQuizApp({required this.hintCount, required this.totalScore});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,18 +81,33 @@ class AnimeQuizApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.grey[100],
       ),
-      home: HomePage(),
+      home: HomePage(hintCount: hintCount, totalScore: totalScore),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
+  final int hintCount;
+  final int totalScore;
+
+  HomePage({required this.hintCount, required this.totalScore});
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int totalScore = 1000;
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rebuild the AppBar when the dependencies change (e.g., returning to this page)
+    setState(() {});
+  }
+
   List<String> animeTitles = [
     "attack on titan",
     "demon slayer",
@@ -52,10 +130,20 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
+          Tooltip(
+              message:
+                  'Total Hints:  ${HintManager.getHintCount()}', // Show hint count in tooltip
+              child: IconButton(
+                icon: Icon(Icons.lightbulb),
+                onPressed: () {
+                  HintManager.incrementGeneralHint();
+                  setState(() {});
+                },
+              )),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Score: $totalScore',
+              'Score: ${TotalScoreManager.getTotalScore()}',
               style: TextStyle(fontSize: 19),
             ),
           ),
@@ -222,7 +310,9 @@ class _HomePageState extends State<HomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => QuestionsPage(selectedTitles),
+          builder: (context) => QuestionsPage(
+            selectedTitles: selectedTitles,
+          ),
         ),
       );
     }
