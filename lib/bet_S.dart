@@ -111,15 +111,7 @@ class _BetScreenState extends State<BetScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
         onWillPop: () async {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomePage(
-                hintCount: HintManager.getHintCount(),
-                totalScore: TotalScoreManager.getTotalScore(),
-              ),
-            ),
-          );
+          Navigator.of(context).popUntil((route) => route.isFirst);
           return true;
         },
         child: Scaffold(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'questions_page.dart';
 import 'drawer_content.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +14,11 @@ void main() async {
   int defaultTotalScore = prefs.getInt('totalScore') ?? 500;
 
   runApp(
-    AnimeQuizApp(hintCount: defaultHintCount, totalScore: defaultTotalScore),
+    AnimeQuizApp(
+      hintCount: defaultHintCount,
+      totalScore: defaultTotalScore,
+      prefs: prefs, // Pass SharedPreferences to AnimeQuizApp
+    ),
   );
 }
 
@@ -68,8 +73,14 @@ class TotalScoreManager {
 class AnimeQuizApp extends StatelessWidget {
   final int hintCount;
   final int totalScore;
+  final SharedPreferences prefs; // SharedPreferences instance
 
-  AnimeQuizApp({required this.hintCount, required this.totalScore});
+  AnimeQuizApp({
+    required this.hintCount,
+    required this.totalScore,
+    required this.prefs,
+  });
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -81,7 +92,11 @@ class AnimeQuizApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.grey[100],
       ),
-      home: HomePage(hintCount: hintCount, totalScore: totalScore),
+      home: HomePage(
+        hintCount: hintCount,
+        totalScore: totalScore,
+        prefs: prefs, // Pass SharedPreferences to HomePage
+      ),
     );
   }
 }
@@ -89,23 +104,41 @@ class AnimeQuizApp extends StatelessWidget {
 class HomePage extends StatefulWidget {
   final int hintCount;
   final int totalScore;
+  final SharedPreferences prefs; // SharedPreferences instance
 
-  HomePage({required this.hintCount, required this.totalScore});
+  HomePage({
+    required this.hintCount,
+    required this.totalScore,
+    required this.prefs,
+  });
+
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  Map<String, DateTime> titleLockStatus = {};
+
+  // Timer to update the UI
+  late Timer _timer;
+
   @override
   void initState() {
     super.initState();
+    // Initialize the timer
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      // Check if any title lock has expired
+      _checkTitleLockExpiry();
+    });
+    // Load title lock status from SharedPreferences
+    _loadTitleLockStatus();
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Rebuild the AppBar when the dependencies change (e.g., returning to this page)
-    setState(() {});
+  void dispose() {
+    // Cancel the timer when the widget is disposed
+    _timer.cancel();
+    super.dispose();
   }
 
   List<String> animeTitles = [
@@ -131,19 +164,20 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           Tooltip(
-              message:
-                  'Total Hints:  ${HintManager.getHintCount()}', // Show hint count in tooltip
-              child: IconButton(
-                icon: Icon(Icons.lightbulb),
-                onPressed: () {
-                  HintManager.incrementGeneralHint();
-                  setState(() {});
-                },
-              )),
+            message:
+                'Total Hints:  ${widget.prefs.getInt('hintCount') ?? 41}', // Show hint count in tooltip
+            child: IconButton(
+              icon: Icon(Icons.lightbulb),
+              onPressed: () {
+                HintManager.incrementGeneralHint();
+                setState(() {});
+              },
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Score: ${TotalScoreManager.getTotalScore()}',
+              'Score: ${widget.prefs.getInt('totalScore') ?? 500}',
               style: TextStyle(fontSize: 19),
             ),
           ),
@@ -171,6 +205,12 @@ class _HomePageState extends State<HomePage> {
                   itemBuilder: (BuildContext context, int index) {
                     final title = animeTitles[index];
                     final isSelected = selectedTitles.contains(title);
+                    final remainingTime = titleLockStatus.containsKey(title)
+                        ? titleLockStatus[title]!
+                            .difference(DateTime.now())
+                            .inSeconds
+                        : 0;
+                    final isLocked = remainingTime > 0;
 
                     return GestureDetector(
                       onTap: () => toggleSelection(title),
@@ -178,8 +218,9 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16.0),
                           border: Border.all(
-                            color:
-                                isSelected ? Colors.white : Colors.transparent,
+                            color: (isSelected || isLocked)
+                                ? Colors.white
+                                : Colors.transparent,
                             width: 2.0,
                           ),
                         ),
@@ -192,7 +233,7 @@ class _HomePageState extends State<HomePage> {
                                 'assets/$title.png',
                                 fit: BoxFit.cover,
                               ),
-                              if (isSelected)
+                              if ((isSelected))
                                 Positioned.fill(
                                   child: Container(
                                     color: Colors.black.withOpacity(0.5),
@@ -217,6 +258,30 @@ class _HomePageState extends State<HomePage> {
                                     Icons.check,
                                     color: Colors.white,
                                     size: 30.0,
+                                  ),
+                                ),
+                              if (isLocked)
+                                Positioned.fill(
+                                    child: Container(
+                                  color: Colors.black.withOpacity(0.5),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.lock,
+                                      color: Colors.white,
+                                      size: 50,
+                                    ),
+                                  ),
+                                )),
+                              if (isLocked)
+                                Positioned(
+                                  top: 10,
+                                  right: 10,
+                                  child: Text(
+                                    '$remainingTime',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20.0,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -296,6 +361,12 @@ class _HomePageState extends State<HomePage> {
 
   void toggleSelection(String title) {
     setState(() {
+      // Check if the title is locked
+      if (titleLockStatus.containsKey(title) &&
+          titleLockStatus[title]!.isAfter(DateTime.now())) {
+        // Title is still locked, do not toggle selection
+        return;
+      }
       if (selectedTitles.contains(title)) {
         selectedTitles.remove(title);
       } else {
@@ -306,7 +377,19 @@ class _HomePageState extends State<HomePage> {
 
   void navigateToQuestionsPage() {
     if (selectedTitles.length >= 2) {
+      int lockDurationInSeconds = calculateLockDuration(selectedTitles.length);
+      // Lock titles after "Start Quiz" button is clicked
+      for (String title in selectedTitles) {
+        titleLockStatus[title] =
+            DateTime.now().add(Duration(seconds: lockDurationInSeconds));
+        // Save title lock status to SharedPreferences
+        widget.prefs.setString(
+          title,
+          titleLockStatus[title]!.toIso8601String(),
+        );
+      }
       print("Selected Titles in HomePage: $selectedTitles");
+      // Navigate to QuestionsPage
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -314,7 +397,48 @@ class _HomePageState extends State<HomePage> {
             selectedTitles: selectedTitles,
           ),
         ),
-      );
+      ).then((_) {
+        // Clear selectedTitles after returning from QuestionsPage
+        selectedTitles.clear();
+      });
     }
+  }
+
+  int calculateLockDuration(int numberOfSelectedTitles) {
+    switch (numberOfSelectedTitles) {
+      case 2:
+        return 10 * 60; // 10 minutes
+      case 3:
+        return 7 * 60 + 30; // 7 minutes and 30 seconds
+      case 4:
+        return 5 * 60; // 5 minutes
+      case 5:
+        return 2 * 60 + 30; // 2 minutes and 30 seconds
+      case 6:
+        return 0; // No lock
+      default:
+        return 0; // No lock by default
+    }
+  }
+
+  void _checkTitleLockExpiry() {
+    // Check if any title lock has expired
+    setState(() {
+      titleLockStatus
+          .removeWhere((title, lockTime) => lockTime.isBefore(DateTime.now()));
+    });
+  }
+
+  void _loadTitleLockStatus() {
+    // Load title lock status from SharedPreferences
+    animeTitles.forEach((title) {
+      String? lockTimeStr = widget.prefs.getString(title);
+      if (lockTimeStr != null) {
+        DateTime lockTime = DateTime.parse(lockTimeStr);
+        if (lockTime.isAfter(DateTime.now())) {
+          titleLockStatus[title] = lockTime;
+        }
+      }
+    });
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:quiz/main.dart';
 import 'dart:math';
 import 'questions.dart';
+import 'bet_S.dart';
 
 class SummaryPage extends StatefulWidget {
   final List<AnimeQuestion> questions;
@@ -436,14 +437,8 @@ class _SummaryPageState extends State<SummaryPage>
                 ),
                 GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HomePage(
-                            hintCount: HintManager.getHintCount(),
-                            totalScore: TotalScoreManager.getTotalScore()),
-                      ),
-                    );
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => BetScreen()));
                     print("Total Score: ${TotalScoreManager.getTotalScore()}");
                   },
                   child: Container(

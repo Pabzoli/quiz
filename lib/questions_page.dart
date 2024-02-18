@@ -7,7 +7,7 @@ import 'main.dart';
 
 const int numberOfQuestions = 10;
 const Duration answerDelay = Duration(milliseconds: 500);
-const Duration animationDuration = Duration(milliseconds: 167);
+const Duration animationDuration = Duration(milliseconds: 250);
 const double initialFontSize = 27;
 
 class QuestionsPage extends StatefulWidget {
@@ -356,7 +356,7 @@ class _QuestionsPageState extends State<QuestionsPage>
                     if (showCorrectAnswer || showWrongAnswer)
                       Center(
                         child: AnimatedOpacity(
-                          duration: Duration(milliseconds: 1000),
+                          duration: Duration(milliseconds: 2000),
                           opacity:
                               showCorrectAnswer || showWrongAnswer ? 1.0 : 0.0,
                           curve: Curves
@@ -542,15 +542,9 @@ class _QuestionsPageState extends State<QuestionsPage>
         _timer.cancel(); // Cancel the previous timer
         startTimer(); // Start the timer for the next question
       } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomePage(
-              hintCount: HintManager.getHintCount(),
-              totalScore: TotalScoreManager.getTotalScore(),
-            ),
-          ),
-        );
+        Navigator.pop(context);
+
+        // Stop the timer when all questions are finished
         _timer.cancel(); // Stop the timer when all questions are finished
       }
 
