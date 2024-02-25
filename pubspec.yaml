@@ -79,6 +79,11 @@ flutter:
     - assets/winner_image.png
     - assets/draw_image.png
     - assets/loser_image.png
+    - assets/dark.jpg
+    - assets/Raiden_Shogun.png
+    - assets/rakd.jpg
+    - assets/Skad_Heart.jpg
+    - assets/icons_trophy.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

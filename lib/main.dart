@@ -3,6 +3,8 @@ import 'questions_page.dart';
 import 'drawer_content.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'package:provider/provider.dart';
+import 'PI_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,10 +16,17 @@ void main() async {
   int defaultTotalScore = prefs.getInt('totalScore') ?? 500;
 
   runApp(
-    AnimeQuizApp(
-      hintCount: defaultHintCount,
-      totalScore: defaultTotalScore,
-      prefs: prefs, // Pass SharedPreferences to AnimeQuizApp
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+            create: (_) =>
+                PlayerStatisticsProvider()), // Add PlayerStatisticsProvider
+      ],
+      child: AnimeQuizApp(
+        hintCount: defaultHintCount,
+        totalScore: defaultTotalScore,
+        prefs: prefs, // Pass SharedPreferences to AnimeQuizApp
+      ),
     ),
   );
 }

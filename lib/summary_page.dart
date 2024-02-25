@@ -3,6 +3,8 @@ import 'package:quiz/main.dart';
 import 'dart:math';
 import 'questions.dart';
 import 'bet_S.dart';
+import 'package:provider/provider.dart';
+import 'PI_page.dart';
 
 class SummaryPage extends StatefulWidget {
   final List<AnimeQuestion> questions;
@@ -39,6 +41,7 @@ class _SummaryPageState extends State<SummaryPage>
     _playerName = widget.playerName;
     betScore = widget.betScore;
     playerScore = widget.playerScore;
+    updatePStats();
   }
 
   @override
@@ -60,12 +63,40 @@ class _SummaryPageState extends State<SummaryPage>
     );
   }
 
+  void updateGamesWon() {
+    final playerStatisticsProvider =
+        Provider.of<PlayerStatisticsProvider>(context, listen: false);
+    final playerStatistics = playerStatisticsProvider.playerStatistics;
+    playerStatistics.gamesWon += 1; // Increment gamesWon by 1
+    playerStatisticsProvider.updatePlayerStatistics(
+        playerStatistics); // Update the player statistics
+  }
+
+  void updatePStats() {
+    final playerStatisticsProvider =
+        Provider.of<PlayerStatisticsProvider>(context, listen: false);
+    final playerStatistics = playerStatisticsProvider.playerStatistics;
+    if (betScore > playerStatistics.hseStaked) {
+      playerStatistics.hseStaked = betScore;
+    }
+    playerStatistics.gamesPlayed += 1;
+    playerStatisticsProvider.updatePlayerStatistics(playerStatistics);
+  }
+
+  void updateGamesLost() {
+    final playerStatisticsProvider =
+        Provider.of<PlayerStatisticsProvider>(context, listen: false);
+    final playerStatistics = playerStatisticsProvider.playerStatistics;
+    playerStatistics.gamesLost += 1;
+    playerStatisticsProvider.updatePlayerStatistics(playerStatistics);
+  }
+
   void setOpponentScore() {
     final random =
         Random().nextInt(100); // Generating a random number between 0 and 99
-    if (random < 85) {
+    if (random < 15) {
       opponentScore = 10; // 85% chance of score 10
-    } else if (random < 95) {
+    } else if (random < 25) {
       opponentScore = 9; // 10% chance of score 9
     } else {
       opponentScore = 8; // 5% chance of score 8
@@ -129,6 +160,9 @@ class _SummaryPageState extends State<SummaryPage>
   }
 
   Widget _buildSummaryPage() {
+    final playerStatisticsProvider =
+        Provider.of<PlayerStatisticsProvider>(context, listen: false);
+    final playerStatistics = playerStatisticsProvider.playerStatistics;
     setOpponentScore();
     List<String> participants = ['Player', '$_playerName'];
     List<int> scores = [playerScore, opponentScore];
@@ -159,11 +193,20 @@ class _SummaryPageState extends State<SummaryPage>
       betScore = 0;
       stotalbet = 0;
       print("Total Score: ${TotalScoreManager.getTotalScore()}");
+      updateGamesWon();
+      if (totalN > playerStatistics.hseWon) {
+        playerStatistics.hseWon = totalN;
+        playerStatisticsProvider.updatePlayerStatistics(playerStatistics);
+      }
     } else if (playerScore == opponentScore) {
       outcomeIndex = 1;
       adjustedBetScore += (betScore * 0.5).toInt();
       TotalScoreManager.addToTotalScore(adjustedBetScore);
       outcomeText = "$adjustedBetScore Was Returned";
+      if (adjustedBetScore > playerStatistics.hseWon) {
+        playerStatistics.hseWon = adjustedBetScore;
+        playerStatisticsProvider.updatePlayerStatistics(playerStatistics);
+      }
       adjustedBetScore = 0;
       betScore = 0;
       stotalbet = 0;
@@ -172,14 +215,20 @@ class _SummaryPageState extends State<SummaryPage>
       outcomeIndex = 2;
       outcomeText = "RIP You Lost $betScore";
       print("Total Score: ${TotalScoreManager.getTotalScore()}");
+      if (totalN > playerStatistics.hseLost) {
+        playerStatistics.hseLost = totalN;
+        playerStatisticsProvider.updatePlayerStatistics(playerStatistics);
+      }
       betScore = 0;
       stotalbet = 0;
+      updateGamesLost();
     }
     return WillPopScope(
         onWillPop: () async {
           return false;
         },
-        child: Column(
+        child: SingleChildScrollView(
+            child: Column(
           children: [
             Card(
               shape: RoundedRectangleBorder(
@@ -463,6 +512,6 @@ class _SummaryPageState extends State<SummaryPage>
               ],
             ),
           ],
-        ));
+        )));
   }
 }

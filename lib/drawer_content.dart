@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quiz/PI_page.dart';
 import 'package:quiz/bet_S.dart';
 
 class CustomDrawer extends StatelessWidget {
@@ -28,7 +29,10 @@ class CustomDrawer extends StatelessWidget {
               icon: Icons.person,
               text: 'Player Information',
               onTap: () {
-                // Handle tapping on player information
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PInform()),
+                );
               },
               backgroundColor: Colors.purple, // Background color for the tile
             ),
